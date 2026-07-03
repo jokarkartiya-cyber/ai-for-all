@@ -11,3 +11,7 @@ coverage/
 uploads/
 .tmp/
 docker-compose.override.yml
+*.db
+*.db-wal
+*.db-shm
+*.db-journal

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
 import rateLimit from "express-rate-limit";
 import { config } from "./config";
 import { errorHandler, notFoundHandler } from "./middleware/error";
@@ -11,6 +12,7 @@ import userRoutes from "./routes/user";
 import projectRoutes from "./routes/projects";
 import aiRoutes from "./routes/ai";
 import adminRoutes from "./routes/admin";
+import uploadRoutes from "./routes/upload";
 
 export const app = express();
 
@@ -38,6 +40,8 @@ app.use("/api/user", userRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 app.use(notFoundHandler);
 app.use(errorHandler);

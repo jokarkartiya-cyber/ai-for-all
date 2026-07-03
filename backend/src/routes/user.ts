@@ -3,6 +3,7 @@ import { authenticate } from "../middleware/auth";
 import {
   updateSettings,
   updateProfile,
+  changePassword,
   listApiKeys,
   createApiKey,
   deleteApiKey,
@@ -15,6 +16,7 @@ router.use(authenticate);
 
 router.patch("/settings", updateSettings);
 router.patch("/profile", updateProfile);
+router.put("/password", changePassword);
 
 router.get("/api-keys", listApiKeys);
 router.post("/api-keys", createApiKey);

@@ -60,7 +60,7 @@ function createSqliteDriver(): DatabaseDriver {
 
       const transformedSql = text
         .replace(/\$(\d+)/g, "?")
-        .replace(/NOW\(\)/gi, "datetime('now')")
+        .replace(/NOW\(\)/gi, "(datetime('now'))")
         .replace(/TRUE/gi, "1")
         .replace(/FALSE/gi, "0")
         .replace(/::jsonb/g, "")

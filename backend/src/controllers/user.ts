@@ -107,6 +107,37 @@ export async function deleteApiKey(req: AuthRequest, res: Response) {
   }
 }
 
+export async function changePassword(req: AuthRequest, res: Response) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: "Current and new password required" });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: "New password must be at least 8 characters" });
+    }
+
+    const user = await query("SELECT password_hash FROM users WHERE id = $1", [req.userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.rows[0].password_hash as string);
+    if (!valid) {
+      return res.status(400).json({ success: false, error: "Current password is incorrect" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2", [passwordHash, req.userId]);
+
+    logger.info("Password changed", { userId: req.userId });
+    res.json({ success: true, message: "Password changed successfully" });
+  } catch (error) {
+    logger.error("Change password failed", { error });
+    res.status(500).json({ success: false, error: "Failed to change password" });
+  }
+}
+
 export async function listSessions(req: AuthRequest, res: Response) {
   try {
     const result = await query(

@@ -37,6 +37,14 @@ export function SettingsPage() {
   const [minimap, setMinimap] = useState(user?.settings.minimap ?? true);
   const [lineNumbers, setLineNumbers] = useState(user?.settings.lineNumbers ?? true);
   const [saving, setSaving] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [username, setUsername] = useState(user?.username || "");
+  const [avatar, setAvatar] = useState(user?.avatar || "");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [language, setLanguage] = useState(user?.settings.language || "en");
 
   useEffect(() => {
     loadApiKeys();
@@ -98,6 +106,59 @@ export function SettingsPage() {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const { data } = await api.post("/upload/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setAvatar(data.data.avatar);
+      toast.success("Avatar uploaded");
+    } catch {
+      toast.error("Failed to upload avatar");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await api.patch("/user/profile", { username, avatar });
+      toast.success("Profile saved");
+    } catch {
+      toast.error("Failed to save profile");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword) {
+      toast.error("Fill in both fields");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.put("/user/password", { currentPassword, newPassword });
+      toast.success("Password changed");
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch {
+      toast.error("Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -108,6 +169,7 @@ export function SettingsPage() {
         autoSave,
         minimap,
         lineNumbers,
+        language,
       });
       toast.success("Settings saved");
     } catch {
@@ -156,6 +218,44 @@ export function SettingsPage() {
                 min={10}
                 max={30}
               />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Language</label>
+              <select className="input w-32" value={language} onChange={(e) => setLanguage(e.target.value)}>
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+                <option value="zh">Chinese</option>
+                <option value="ja">Japanese</option>
+                <option value="ar">Arabic</option>
+                <option value="pt">Portuguese</option>
+                <option value="ru">Russian</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-surface-900 dark:text-white">
+            Profile
+          </h2>
+          <div className="card space-y-4">
+            <div>
+              <label className="text-xs font-medium text-surface-500 block mb-1">Username</label>
+              <input className="input w-full h-8 text-xs" value={username} onChange={(e) => setUsername(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-surface-500 block mb-1">Avatar</label>
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" className="input w-full h-8 text-xs file:mr-2 file:py-0.5 file:px-2 file:border-0 file:bg-primary-500 file:text-white file:rounded file:text-xs" onChange={handleAvatarUpload} />
+                {uploadingAvatar && <span className="text-xs text-surface-400">Uploading...</span>}
+              </div>
+              {avatar && <img src={avatar.startsWith("http") ? avatar : `${import.meta.env.VITE_API_URL || "/api"}/..${avatar}`} alt="preview" className="mt-2 w-10 h-10 rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />}
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSaveProfile} loading={savingProfile}>Save Profile</Button>
             </div>
           </div>
         </section>
@@ -255,6 +355,33 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-surface-900 dark:text-white">
+            Change Password
+          </h2>
+          <div className="card space-y-4">
+            <input
+              type="password"
+              className="input w-full h-8 text-xs"
+              placeholder="Current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+            <input
+              type="password"
+              className="input w-full h-8 text-xs"
+              placeholder="New password (min 8 chars)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleChangePassword} loading={changingPassword}>
+                Change Password
+              </Button>
+            </div>
+          </div>
         </section>
 
         <section className="space-y-4">

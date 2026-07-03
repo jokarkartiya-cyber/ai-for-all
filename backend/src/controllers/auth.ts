@@ -37,6 +37,14 @@ export async function signup(req: AuthRequest, res: Response) {
 
     const user = result.rows[0];
     const token = generateToken(user.id);
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const device = ((req.headers["user-agent"] as string) || "Unknown").slice(0, 255);
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || (req.ip as string) || "0.0.0.0";
+
+    await query(
+      "INSERT INTO sessions (user_id, token, device, ip) VALUES ($1, $2, $3, $4)",
+      [user.id, tokenHash, device, ip]
+    );
 
     logger.info("User signed up", { userId: user.id, email });
 
@@ -104,6 +112,14 @@ export async function login(req: AuthRequest, res: Response) {
     }
 
     const token = generateToken(user.id);
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const device = ((req.headers["user-agent"] as string) || "Unknown").slice(0, 255);
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || (req.ip as string) || "0.0.0.0";
+
+    await query(
+      "INSERT INTO sessions (user_id, token, device, ip) VALUES ($1, $2, $3, $4)",
+      [user.id, tokenHash, device, ip]
+    );
 
     logger.info("User logged in", { userId: user.id });
 
@@ -123,6 +139,27 @@ export async function login(req: AuthRequest, res: Response) {
   } catch (error) {
     logger.error("Login failed", { error });
     res.status(500).json({ success: false, error: "Login failed" });
+  }
+}
+
+export async function logout(req: AuthRequest, res: Response) {
+  try {
+    const authHeader = req.headers.authorization as string;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "No token provided" });
+    }
+
+    const token = authHeader.slice(7);
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    await query("DELETE FROM sessions WHERE token = $1 AND user_id = $2", [tokenHash, req.userId]);
+
+    logger.info("User logged out", { userId: req.userId });
+
+    res.json({ success: true, message: "Logged out" });
+  } catch (error) {
+    logger.error("Logout failed", { error });
+    res.status(500).json({ success: false, error: "Logout failed" });
   }
 }
 
