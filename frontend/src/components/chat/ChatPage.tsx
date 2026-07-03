@@ -14,6 +14,9 @@ import {
   Bot,
   User,
   ExternalLink,
+  Pencil,
+  X,
+  Upload,
 } from "lucide-react";
 import type { Message } from "@shared/types/chat";
 import type { ComponentProps } from "react";
@@ -24,6 +27,7 @@ export function ChatPage() {
     isStreaming,
     isLoading,
     sendMessage,
+    importChats,
     stopGeneration,
   } = useChatStore();
   const [input, setInput] = useState("");
@@ -134,6 +138,10 @@ export function ChatPage() {
                 </button>
               ))}
             </div>
+            <label className="btn-secondary text-xs inline-flex items-center gap-1 cursor-pointer">
+              <Upload className="h-3 w-3" /> Import Chats
+              <input type="file" accept=".json" className="hidden" onChange={async (e) => { if (e.target.files?.[0]) { await importChats(e.target.files[0]); e.target.value = ""; } }} />
+            </label>
           </div>
         </div>
       )}
@@ -171,11 +179,21 @@ function CodeBlock({ className, children, ...props }: ComponentProps<"code">) {
 
 function MessageBubble({ message, isStreaming }: { message: Message; isStreaming?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+  const { regenerateMessage, updateMessage } = useChatStore();
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleEditSave = async () => {
+    if (editContent.trim() && editContent !== message.content) {
+      await updateMessage(message.id, editContent.trim());
+    }
+    setEditing(false);
   };
 
   const displayContent = message.content + (isStreaming ? " ▌" : "");
@@ -208,7 +226,22 @@ function MessageBubble({ message, isStreaming }: { message: Message; isStreaming
           )}
         >
           {message.role === "user" ? (
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            editing ? (
+              <div className="space-y-2">
+                <textarea
+                  className="w-full bg-white/20 rounded p-2 text-sm resize-none min-h-[60px]"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setEditing(false)} className="text-xs btn-ghost p-1"><X className="h-3 w-3" /></button>
+                  <button onClick={handleEditSave} className="text-xs btn-ghost p-1"><Check className="h-3 w-3" /></button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            )
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown components={{ code: CodeBlock }}>{displayContent}</ReactMarkdown>
@@ -238,8 +271,21 @@ function MessageBubble({ message, isStreaming }: { message: Message; isStreaming
                 </button>
               )}
               {message.role === "assistant" && (
-                <button className="btn-ghost p-1 text-surface-400 hover:text-surface-600" title="Regenerate">
+                <button
+                  onClick={regenerateMessage}
+                  className="btn-ghost p-1 text-surface-400 hover:text-surface-600"
+                  title="Regenerate"
+                >
                   <RefreshCw className="h-3 w-3" />
+                </button>
+              )}
+              {message.role === "user" && !editing && (
+                <button
+                  onClick={() => { setEditContent(message.content); setEditing(true); }}
+                  className="btn-ghost p-1 text-surface-400 hover:text-surface-600"
+                  title="Edit"
+                >
+                  <Pencil className="h-3 w-3" />
                 </button>
               )}
             </>

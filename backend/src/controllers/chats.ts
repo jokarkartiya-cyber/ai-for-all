@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Response } from "express";
 import { query } from "../config/database";
 import { logger } from "../utils/logger";
@@ -183,6 +184,126 @@ export async function togglePin(req: AuthRequest, res: Response) {
   } catch (error) {
     logger.error("Toggle pin failed", { error });
     res.status(500).json({ success: false, error: "Failed to toggle pin" });
+  }
+}
+
+export async function regenerateMessage(req: AuthRequest, res: Response) {
+  try {
+    const chatResult = await query(
+      "SELECT messages, model, provider FROM chats WHERE id = $1 AND user_id = $2",
+      [req.params.id, req.userId]
+    );
+
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const chat = chatResult.rows[0];
+    const messages = parseJsonField<Record<string, unknown>[]>(chat.messages) || [];
+
+    if (messages.length < 2) {
+      return res.status(400).json({ success: false, error: "No message to regenerate" });
+    }
+
+    const lastUserMsgIndex = messages.length - 2;
+    if (messages[lastUserMsgIndex].role !== "user") {
+      return res.status(400).json({ success: false, error: "No user message to regenerate from" });
+    }
+
+    const history = messages.slice(0, lastUserMsgIndex + 1).map((m) => ({
+      role: m.role as string,
+      content: m.content as string,
+    }));
+
+    const aiResponse = await callAiService(history, chat.model as string, chat.provider as string);
+
+    const assistantMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: aiResponse.content,
+      timestamp: new Date().toISOString(),
+      model: aiResponse.model,
+    };
+
+    const updatedMessages = [...messages.slice(0, lastUserMsgIndex + 1), assistantMessage];
+
+    await query(
+      `UPDATE chats SET messages = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(updatedMessages), req.params.id]
+    );
+
+    res.json({ success: true, data: assistantMessage });
+  } catch (error) {
+    logger.error("Regenerate failed", { error });
+    res.status(500).json({ success: false, error: "Failed to regenerate" });
+  }
+}
+
+export async function updateMessage(req: AuthRequest, res: Response) {
+  try {
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ success: false, error: "Content required" });
+    }
+
+    const chatResult = await query(
+      "SELECT messages FROM chats WHERE id = $1 AND user_id = $2",
+      [req.params.id, req.userId]
+    );
+
+    if (chatResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const messages = parseJsonField<Record<string, unknown>[]>(chatResult.rows[0].messages) || [];
+    const msgIndex = messages.findIndex((m) => m.id === req.params.messageId);
+
+    if (msgIndex === -1) {
+      return res.status(404).json({ success: false, error: "Message not found" });
+    }
+
+    messages[msgIndex].content = content;
+    messages[msgIndex].edited = true;
+
+    await query(
+      "UPDATE chats SET messages = $1, updated_at = NOW() WHERE id = $2",
+      [JSON.stringify(messages), req.params.id]
+    );
+
+    res.json({ success: true, message: "Message updated" });
+  } catch (error) {
+    logger.error("Update message failed", { error });
+    res.status(500).json({ success: false, error: "Failed to update message" });
+  }
+}
+
+export async function importChats(req: AuthRequest, res: Response) {
+  try {
+    const { chats } = req.body;
+    if (!Array.isArray(chats) || chats.length === 0) {
+      return res.status(400).json({ success: false, error: "Chats array required" });
+    }
+
+    const imported = [];
+    for (const chat of chats) {
+      const result = await query(
+        `INSERT INTO chats (user_id, title, model, provider, messages) VALUES ($1, $2, $3, $4, $5) RETURNING id, title`,
+        [
+          req.userId,
+          chat.title || "Imported Chat",
+          chat.model || "gpt-4o",
+          chat.provider || "openai",
+          JSON.stringify(chat.messages || []),
+        ]
+      );
+      imported.push(result.rows[0]);
+    }
+
+    logger.info("Chats imported", { userId: req.userId, count: imported.length });
+    res.status(201).json({ success: true, data: imported, count: imported.length });
+  } catch (error) {
+    logger.error("Import chats failed", { error });
+    res.status(500).json({ success: false, error: "Failed to import chats" });
   }
 }
 

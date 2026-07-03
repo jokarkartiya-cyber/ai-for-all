@@ -9,6 +9,9 @@ import {
   togglePin,
   sendMessage,
   sendMessageStream,
+  regenerateMessage,
+  updateMessage,
+  importChats,
 } from "../controllers/chats";
 
 const router = Router();
@@ -23,5 +26,8 @@ router.delete("/:id", deleteChat);
 router.post("/:id/pin", togglePin);
 router.post("/:id/messages", sendMessage);
 router.post("/:id/messages/stream", sendMessageStream);
+router.post("/:id/regenerate", regenerateMessage);
+router.put("/:id/messages/:messageId", updateMessage);
+router.post("/import", importChats);
 
 export default router;

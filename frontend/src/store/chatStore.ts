@@ -15,6 +15,9 @@ interface ChatState {
   selectChat: (id: string) => Promise<void>;
   createChat: () => Promise<string>;
   sendMessage: (content: string) => Promise<void>;
+  regenerateMessage: () => Promise<void>;
+  updateMessage: (messageId: string, content: string) => Promise<void>;
+  importChats: (file: File) => Promise<void>;
   stopGeneration: () => void;
   deleteChat: (id: string) => Promise<void>;
   renameChat: (id: string, title: string) => Promise<void>;
@@ -210,6 +213,51 @@ export const useChatStore = create<ChatState>()(
     exportChat: async (id) => {
       const { data } = await api.get(`/chats/${id}/export`);
       return data.data;
+    },
+
+    regenerateMessage: async () => {
+      const chat = get().currentChat;
+      if (!chat) return;
+      try {
+        const { data } = await api.post(`/chats/${chat.id}/regenerate`);
+        const msgs = chat.messages.slice(0, -1);
+        msgs.push(data.data);
+        set((state) => {
+          if (state.currentChat) {
+            state.currentChat.messages = msgs;
+          }
+        });
+      } catch {
+        // ignore
+      }
+    },
+
+    updateMessage: async (messageId, content) => {
+      const chat = get().currentChat;
+      if (!chat) return;
+      try {
+        await api.put(`/chats/${chat.id}/messages/${messageId}`, { content });
+        set((state) => {
+          const msgs = state.currentChat?.messages;
+          if (msgs) {
+            const idx = msgs.findIndex((m) => m.id === messageId);
+            if (idx !== -1) {
+              msgs[idx].content = content;
+              (msgs[idx] as any).edited = true;
+            }
+          }
+        });
+      } catch {
+        // ignore
+      }
+    },
+
+    importChats: async (file: File) => {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const chats = Array.isArray(data) ? data : data.chats || [data];
+      await api.post("/chats/import", { chats });
+      await get().loadChats();
     },
   }))
 );
