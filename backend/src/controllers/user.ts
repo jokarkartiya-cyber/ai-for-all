@@ -10,6 +10,19 @@ function hashApiKey(key: string): string {
   return crypto.createHash("sha256").update(key).digest("hex");
 }
 
+export async function getSettings(req: AuthRequest, res: Response) {
+  try {
+    const result = await query("SELECT settings FROM users WHERE id = $1", [req.userId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+    res.json({ success: true, data: { settings: parseJsonField(result.rows[0].settings) } });
+  } catch (error) {
+    logger.error("Get settings failed", { error });
+    res.status(500).json({ success: false, error: "Failed to get settings" });
+  }
+}
+
 export async function updateSettings(req: AuthRequest, res: Response) {
   try {
     const current = await query("SELECT settings FROM users WHERE id = $1", [req.userId]);

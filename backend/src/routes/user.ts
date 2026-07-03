@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import {
+  getSettings,
   updateSettings,
   updateProfile,
   changePassword,
@@ -14,6 +15,7 @@ import {
 const router = Router();
 router.use(authenticate);
 
+router.get("/settings", getSettings);
 router.patch("/settings", updateSettings);
 router.patch("/profile", updateProfile);
 router.put("/password", changePassword);
