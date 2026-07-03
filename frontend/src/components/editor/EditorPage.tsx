@@ -48,6 +48,7 @@ export function EditorPage() {
   const closeSecondaryTab = useProjectStore((s) => s.closeSecondaryTab);
 
   const userSettings = useAuthStore((s) => s.user?.settings);
+  const saveFile = useProjectStore((s) => s.saveFile);
   const [showExplorer, setShowExplorer] = useState(true);
   const [showAiSidebar, setShowAiSidebar] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -86,6 +87,18 @@ export function EditorPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTabId, openTabs, closeFile, setActiveTab]);
+
+  // Auto-save timer
+  useEffect(() => {
+    if (!userSettings?.autoSave) return;
+
+    const interval = setInterval(() => {
+      const dirtyTabs = openTabs.filter((t) => t.isDirty);
+      dirtyTabs.forEach((t) => saveFile(t.path));
+    }, userSettings.autoSaveInterval || 5000);
+
+    return () => clearInterval(interval);
+  }, [userSettings?.autoSave, userSettings?.autoSaveInterval, openTabs, saveFile]);
 
   const activeTab = openTabs.find((t) => t.id === activeTabId);
   const code = activeTab?.content ?? WELCOME_CODE;
