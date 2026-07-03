@@ -229,7 +229,7 @@ export async function sendMessage(req: AuthRequest, res: Response) {
 
     await query(
       `UPDATE chats SET messages = $1, updated_at = NOW(),
-       title = CASE WHEN jsonb_array_length(messages) = 2 THEN substr($2, 1, 100) ELSE title END
+       title = CASE WHEN jsonb_array_length(messages::jsonb) = 2 THEN substr($2, 1, 100) ELSE title END
        WHERE id = $3`,
       [JSON.stringify(updatedMessages), message, req.params.id]
     );
@@ -339,7 +339,7 @@ export async function sendMessageStream(req: AuthRequest, res: Response) {
       const updatedMessages = [...messages, userMessage, assistantMessage];
       await query(
         `UPDATE chats SET messages = $1, updated_at = NOW(),
-         title = CASE WHEN jsonb_array_length(messages) = 2 THEN substr($2, 1, 100) ELSE title END
+         title = CASE WHEN jsonb_array_length(messages::jsonb) = 2 THEN substr($2, 1, 100) ELSE title END
          WHERE id = $3`,
         [JSON.stringify(updatedMessages), message, req.params.id]
       );
@@ -361,7 +361,7 @@ export async function sendMessageStream(req: AuthRequest, res: Response) {
       const updatedMessages = [...messages, userMessage, mockAssistantMessage];
       await query(
         `UPDATE chats SET messages = $1, updated_at = NOW(),
-         title = CASE WHEN jsonb_array_length(messages) = 2 THEN substr($2, 1, 100) ELSE title END
+         title = CASE WHEN jsonb_array_length(messages::jsonb) = 2 THEN substr($2, 1, 100) ELSE title END
          WHERE id = $3`,
         [JSON.stringify(updatedMessages), message, req.params.id]
       );
