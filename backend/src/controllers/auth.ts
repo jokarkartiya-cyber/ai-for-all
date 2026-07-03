@@ -29,10 +29,13 @@ export async function signup(req: AuthRequest, res: Response) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const userCount = await query("SELECT COUNT(*) as c FROM users");
+    const isFirstUser = parseInt(userCount.rows[0]?.c as string || "0") === 0;
+    const role = isFirstUser ? "admin" : "user";
     const result = await query(
-      `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)
+      `INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)
        RETURNING id, username, email, role, settings, created_at`,
-      [username, email, passwordHash]
+      [username, email, passwordHash, role]
     );
 
     const user = result.rows[0];
