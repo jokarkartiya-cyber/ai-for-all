@@ -99,18 +99,6 @@ function createSqliteDriver(): DatabaseDriver {
 }
 
 export async function initDatabase(): Promise<boolean> {
-  if (config.nodeEnv === "production") {
-    try {
-      db = await createPostgresDriver();
-      await db.query("SELECT 1");
-      logger.info("PostgreSQL connection established");
-      return true;
-    } catch (err) {
-      logger.error("PostgreSQL connection failed", { error: (err as Error).message });
-      return false;
-    }
-  }
-
   try {
     db = await createPostgresDriver();
     await db.query("SELECT 1");

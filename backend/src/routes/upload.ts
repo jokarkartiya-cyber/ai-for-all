@@ -6,8 +6,14 @@ import type { AuthRequest } from "../middleware/auth";
 import { query } from "../config/database";
 import { logger } from "../utils/logger";
 
+const uploadDir = path.resolve(process.cwd(), "uploads");
+import fs from "fs";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: path.resolve(process.cwd(), "uploads"),
+  destination: uploadDir,
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
