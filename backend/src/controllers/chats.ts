@@ -102,6 +102,34 @@ export async function getChat(req: AuthRequest, res: Response) {
   }
 }
 
+export async function exportChat(req: AuthRequest, res: Response) {
+  try {
+    const result = await query(
+      "SELECT id, title, model, provider, messages, created_at, updated_at FROM chats WHERE id = $1 AND user_id = $2",
+      [req.params.id, req.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    const chat = result.rows[0];
+    chat.messages = parseJsonField(chat.messages);
+
+    res.json({
+      success: true,
+      data: JSON.stringify({
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        chats: [chat],
+      }, null, 2),
+    });
+  } catch (error) {
+    logger.error("Export chat failed", { error });
+    res.status(500).json({ success: false, error: "Failed to export chat" });
+  }
+}
+
 export async function createChat(req: AuthRequest, res: Response) {
   try {
     const result = await query(

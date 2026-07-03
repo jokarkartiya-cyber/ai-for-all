@@ -13,6 +13,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Shield,
+  Download,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +32,7 @@ export function Sidebar() {
     deleteChat,
     renameChat,
     togglePin,
+    exportChat,
     currentChat,
   } = useChatStore();
   const [collapsed, setCollapsed] = useState(false);
@@ -40,6 +42,21 @@ export function Sidebar() {
   useEffect(() => {
     loadChats();
   }, [loadChats]);
+
+  const handleExport = async (chatId: string) => {
+    try {
+      const json = await exportChat(chatId);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chat-${chatId.slice(0, 8)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // ignore
+    }
+  };
 
   const handleCreateChat = async () => {
     const id = await createChat();
@@ -126,6 +143,7 @@ export function Sidebar() {
                 onRenameEnd={handleRenameEnd}
                 onEditTitleChange={setEditTitle}
                 onTogglePin={() => togglePin(chat.id)}
+                onExport={() => handleExport(chat.id)}
               />
             ))}
             {unpinnedChats.map((chat) => (
@@ -141,6 +159,7 @@ export function Sidebar() {
                 onRenameEnd={handleRenameEnd}
                 onEditTitleChange={setEditTitle}
                 onTogglePin={() => togglePin(chat.id)}
+                onExport={() => handleExport(chat.id)}
               />
             ))}
           </nav>
@@ -187,6 +206,7 @@ function ChatItem({
   onRenameEnd,
   onEditTitleChange,
   onTogglePin,
+  onExport,
 }: {
   chat: ConversationSummary;
   isActive: boolean;
@@ -198,6 +218,7 @@ function ChatItem({
   onRenameEnd: () => void;
   onEditTitleChange: (v: string) => void;
   onTogglePin: () => void;
+  onExport: () => void;
 }) {
   return (
     <div
@@ -247,6 +268,16 @@ function ChatItem({
           title="Rename"
         >
           <MessageSquare className="h-3 w-3" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onExport();
+          }}
+          className="btn-ghost p-1"
+          title="Export"
+        >
+          <Download className="h-3 w-3" />
         </button>
         <button
           onClick={(e) => {
