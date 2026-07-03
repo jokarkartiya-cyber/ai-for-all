@@ -16,4 +16,5 @@ COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/backend/src ./backend/src
 EXPOSE 3001
 ENV NODE_ENV=production
-CMD ["npx", "--prefix", "backend", "tsx", "src/index.ts"]
+WORKDIR /app/backend
+CMD ["npx", "tsx", "src/index.ts"]
