@@ -51,16 +51,15 @@ export async function signup(req: AuthRequest, res: Response) {
 
     logger.info("User signed up", { userId: user.id, email });
 
-    // Send verification email automatically
-    try {
-      const vToken = generateResetToken();
-      const vExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await query(
-        "INSERT INTO verification_tokens (user_id, token, type, expires_at) VALUES ($1, $2, 'email_verification', $3)",
-        [user.id, vToken, vExpires]
-      );
+    // Send verification email automatically (fire-and-forget)
+    const vToken = generateResetToken();
+    const vExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    query(
+      "INSERT INTO verification_tokens (user_id, token, type, expires_at) VALUES ($1, $2, 'email_verification', $3)",
+      [user.id, vToken, vExpires]
+    ).then(() => {
       const verifyUrl = `${config.appUrl}/verify-email?token=${vToken}`;
-      await sendEmail(
+      sendEmail(
         user.email,
         "Verify your email address",
         buildEmailHtml(
@@ -68,10 +67,8 @@ export async function signup(req: AuthRequest, res: Response) {
           "Thanks for signing up! Please verify your email address by clicking the button below. This link expires in 24 hours.",
           { text: "Verify Email", url: verifyUrl }
         )
-      );
-    } catch (emailErr) {
-      logger.warn("Failed to send verification email on signup", { error: emailErr });
-    }
+      ).catch((emailErr) => logger.warn("Failed to send verification email", { error: emailErr }));
+    }).catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -218,7 +215,7 @@ export async function forgotPassword(req: AuthRequest, res: Response) {
     );
 
     const resetUrl = `${config.appUrl}/reset-password?token=${token}`;
-    await sendEmail(
+    sendEmail(
       email,
       "Reset your password",
       buildEmailHtml(
@@ -226,7 +223,7 @@ export async function forgotPassword(req: AuthRequest, res: Response) {
         "We received a request to reset your password. Click the button below to set a new one. This link expires in 1 hour.",
         { text: "Reset Password", url: resetUrl }
       )
-    );
+    ).catch((emailErr) => logger.warn("Failed to send reset email", { error: emailErr }));
 
     res.json({ success: true, message: "If the email exists, a reset link has been sent" });
   } catch (error) {
