@@ -204,7 +204,7 @@ export async function resetPassword(req: AuthRequest, res: Response) {
 
     const result = await query(
       `SELECT id, user_id, expires_at FROM password_resets
-       WHERE token = $1 AND used = 0 AND expires_at > datetime('now')`,
+       WHERE token = $1 AND used = 0 AND expires_at > NOW()`,
       [token]
     );
 
@@ -272,7 +272,7 @@ export async function verifyEmail(req: AuthRequest, res: Response) {
 
     const result = await query(
       `SELECT id, user_id FROM verification_tokens
-       WHERE token = $1 AND type = 'email_verification' AND used = 0 AND expires_at > datetime('now')`,
+       WHERE token = $1 AND type = 'email_verification' AND used = 0 AND expires_at > NOW()`,
       [token]
     );
 

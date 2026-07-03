@@ -39,7 +39,7 @@ export async function updateProfile(req: AuthRequest, res: Response) {
       `UPDATE users SET
         username = COALESCE($1, username),
         avatar = COALESCE($2, avatar),
-        updated_at = datetime('now')
+        updated_at = NOW()
        WHERE id = $3
        RETURNING id, username, email, avatar, role`,
       [username, avatar, req.userId]

@@ -33,23 +33,27 @@ async function callAiService(
 export async function listChats(req: AuthRequest, res: Response) {
   try {
     const result = await query(
-      `SELECT id, title, model, provider, pinned,
-              json_array_length(messages) as message_count,
-              CASE WHEN json_array_length(messages) > 0
-                   THEN json_extract(messages, '$[0].content')
-                   ELSE NULL
-              END as preview,
-              created_at, updated_at
+      `SELECT id, title, model, provider, pinned, messages, created_at, updated_at
        FROM chats
        WHERE user_id = $1
        ORDER BY pinned DESC, updated_at DESC`,
       [req.userId]
     );
 
-    const chats = result.rows.map((row) => ({
-      ...row,
-      pinned: !!(row.pinned),
-    }));
+    const chats = result.rows.map((row) => {
+      const msgs = typeof row.messages === 'string' ? JSON.parse(row.messages as string) : (row.messages as any[] || []);
+      return {
+        id: row.id,
+        title: row.title,
+        model: row.model,
+        provider: row.provider,
+        pinned: !!(row.pinned),
+        message_count: msgs.length,
+        preview: msgs.length > 0 ? msgs[0].content || null : null,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    });
 
     res.json({ success: true, data: chats });
   } catch (error) {
@@ -105,7 +109,7 @@ export async function updateChat(req: AuthRequest, res: Response) {
         title = COALESCE($1, title),
         model = COALESCE($2, model),
         provider = COALESCE($3, provider),
-        updated_at = datetime('now')
+        updated_at = NOW()
        WHERE id = $4 AND user_id = $5
        RETURNING *`,
       [title, model, provider, req.params.id, req.userId]
@@ -153,7 +157,7 @@ export async function togglePin(req: AuthRequest, res: Response) {
 
     const newPinned = !chat.rows[0].pinned ? 1 : 0;
     const result = await query(
-      `UPDATE chats SET pinned = $1, updated_at = datetime('now')
+      `UPDATE chats SET pinned = $1, updated_at = NOW()
        WHERE id = $2 AND user_id = $3 RETURNING *`,
       [newPinned, req.params.id, req.userId]
     );
@@ -207,7 +211,7 @@ export async function sendMessage(req: AuthRequest, res: Response) {
     const updatedMessages = [...messages, userMessage, assistantMessage];
 
     await query(
-      `UPDATE chats SET messages = $1, updated_at = datetime('now'),
+      `UPDATE chats SET messages = $1, updated_at = NOW(),
        title = CASE WHEN json_array_length(messages) = 2 THEN substr($2, 1, 100) ELSE title END
        WHERE id = $3`,
       [JSON.stringify(updatedMessages), message, req.params.id]
@@ -317,7 +321,7 @@ export async function sendMessageStream(req: AuthRequest, res: Response) {
 
       const updatedMessages = [...messages, userMessage, assistantMessage];
       await query(
-        `UPDATE chats SET messages = $1, updated_at = datetime('now'),
+        `UPDATE chats SET messages = $1, updated_at = NOW(),
          title = CASE WHEN json_array_length(messages) = 2 THEN substr($2, 1, 100) ELSE title END
          WHERE id = $3`,
         [JSON.stringify(updatedMessages), message, req.params.id]

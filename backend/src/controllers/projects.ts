@@ -171,7 +171,7 @@ export async function updateProject(req: AuthRequest, res: Response) {
         name = COALESCE($1, name),
         language = COALESCE($2, language),
         framework = COALESCE($3, framework),
-        last_opened = datetime('now')
+        last_opened = NOW()
        WHERE id = $4 AND user_id = $5 RETURNING *`,
       [name, language, framework, req.params.id, req.userId]
     );
