@@ -82,7 +82,8 @@ export const useChatStore = create<ChatState>()(
 
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(`/api/chats/${chat.id}/messages/stream`, {
+        const apiUrl = import.meta.env.VITE_API_URL || "/api";
+        const response = await fetch(`${apiUrl}/chats/${chat.id}/messages/stream`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
