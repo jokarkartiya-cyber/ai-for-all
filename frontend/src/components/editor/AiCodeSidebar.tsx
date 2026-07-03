@@ -12,9 +12,64 @@ import {
   Wand2,
   Bug,
   RotateCcw,
+  Zap,
+  MessageSquareText,
+  MessageSquareOff,
+  ArrowLeftRight,
+  FlaskConical,
+  TriangleAlert,
+  Shield,
+  GitCompareArrows,
+  Gauge,
+  Database,
+  Regex,
+  BookOpen,
+  LayoutList,
+  FileText,
+  GitCommit,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
-type ActionType = "explain" | "generate" | "fix" | "refactor";
+type ActionType =
+  | "explain" | "generate" | "fix" | "optimize" | "refactor"
+  | "comments" | "uncomment" | "convert" | "tests" | "errors"
+  | "security" | "complexity" | "performance"
+  | "sql" | "regex" | "docs" | "api" | "readme" | "summary" | "commit";
+
+interface ActionDef {
+  key: ActionType;
+  label: string;
+  icon: React.ReactNode;
+  needsCode: boolean;
+  needsInstruction: boolean;
+  group: string;
+}
+
+const ACTIONS: ActionDef[] = [
+  { key: "explain", label: "Explain", icon: <FileCode className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Code Quality" },
+  { key: "generate", label: "Generate", icon: <Wand2 className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Code Quality" },
+  { key: "fix", label: "Fix Bugs", icon: <Bug className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Code Quality" },
+  { key: "optimize", label: "Optimize", icon: <Zap className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Code Quality" },
+  { key: "refactor", label: "Refactor", icon: <RotateCcw className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: true, group: "Code Quality" },
+  { key: "comments", label: "Add Comments", icon: <MessageSquareText className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Code Quality" },
+  { key: "uncomment", label: "Rm Comments", icon: <MessageSquareOff className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Code Quality" },
+  { key: "convert", label: "Convert", icon: <ArrowLeftRight className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: true, group: "Generation" },
+  { key: "tests", label: "Tests", icon: <FlaskConical className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Generation" },
+  { key: "errors", label: "Errors", icon: <TriangleAlert className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Generation" },
+  { key: "sql", label: "SQL", icon: <Database className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Generation" },
+  { key: "regex", label: "Regex", icon: <Regex className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Generation" },
+  { key: "security", label: "Security", icon: <Shield className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Analysis" },
+  { key: "complexity", label: "Complexity", icon: <GitCompareArrows className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Analysis" },
+  { key: "performance", label: "Perf Tips", icon: <Gauge className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Analysis" },
+  { key: "docs", label: "Docs", icon: <BookOpen className="h-3.5 w-3.5" />, needsCode: true, needsInstruction: false, group: "Documents" },
+  { key: "api", label: "API", icon: <LayoutList className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Documents" },
+  { key: "readme", label: "README", icon: <FileText className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Documents" },
+  { key: "summary", label: "Summary", icon: <Code className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: true, group: "Documents" },
+  { key: "commit", label: "Commit Msg", icon: <GitCommit className="h-3.5 w-3.5" />, needsCode: false, needsInstruction: false, group: "Documents" },
+];
+
+const GROUPS = ["Code Quality", "Generation", "Analysis", "Documents"];
 
 interface CodeSuggestion {
   code: string;
@@ -50,8 +105,11 @@ export function AiCodeSidebar({
   const [loading, setLoading] = useState(false);
   const [applied, setApplied] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const codeBlocks = response ? extractCodeBlocks(response) : [];
+
+  const currentAction = ACTIONS.find((a) => a.key === action);
 
   const handleAction = useCallback(async () => {
     setLoading(true);
@@ -82,12 +140,14 @@ export function AiCodeSidebar({
     setApplied((prev) => new Set(prev).add(index));
   };
 
-  const actionButtons: { key: ActionType; label: string; icon: React.ReactNode }[] = [
-    { key: "explain", label: "Explain", icon: <FileCode className="h-3.5 w-3.5" /> },
-    { key: "generate", label: "Generate", icon: <Wand2 className="h-3.5 w-3.5" /> },
-    { key: "fix", label: "Fix", icon: <Bug className="h-3.5 w-3.5" /> },
-    { key: "refactor", label: "Refactor", icon: <RotateCcw className="h-3.5 w-3.5" /> },
-  ];
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-surface-50 dark:bg-surface-900">
@@ -98,34 +158,55 @@ export function AiCodeSidebar({
         </span>
       </div>
 
-      <div className="p-3 space-y-3">
-        <div className="grid grid-cols-2 gap-1">
-          {actionButtons.map(({ key, label, icon }) => (
-            <button
-              key={key}
-              onClick={() => setAction(key)}
-              className={cn(
-                "flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors",
-                action === key
-                  ? "bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 border border-primary-200 dark:border-primary-800"
-                  : "hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-600 dark:text-surface-400 border border-transparent"
+      <div className="p-3 space-y-2 overflow-y-auto">
+        {GROUPS.map((group) => {
+          const groupActions = ACTIONS.filter((a) => a.group === group);
+          const isCollapsed = collapsedGroups.has(group);
+          return (
+            <div key={group}>
+              <button
+                onClick={() => toggleGroup(group)}
+                className="flex items-center gap-1 w-full text-[10px] font-semibold uppercase tracking-wider text-surface-400 mb-1 hover:text-surface-600"
+              >
+                {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {group}
+              </button>
+              {!isCollapsed && (
+                <div className="grid grid-cols-2 gap-1">
+                  {groupActions.map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAction(key)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2 py-1.5 rounded text-xs transition-colors",
+                        action === key
+                          ? "bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 border border-primary-200 dark:border-primary-800"
+                          : "hover:bg-surface-100 dark:hover:bg-surface-800 text-surface-600 dark:text-surface-400 border border-transparent"
+                      )}
+                    >
+                      {icon}
+                      <span className="truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
               )}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
+            </div>
+          );
+        })}
 
-        {(action === "generate" || action === "fix" || action === "refactor") && (
+        {currentAction?.needsInstruction && (
           <textarea
-            className="input text-xs h-16 resize-none"
+            className="input text-xs h-16 resize-none mt-2"
             placeholder={
-              action === "generate"
-                ? "Describe what to generate..."
-                : action === "fix"
-                ? "Describe the issue (optional)..."
-                : "Describe refactoring goals..."
+              action === "generate" ? "Describe what to generate..." :
+              action === "refactor" ? "Describe refactoring goals..." :
+              action === "convert" ? "Target language (e.g. Python)..." :
+              action === "sql" ? "Describe the query you need..." :
+              action === "regex" ? "Describe the pattern..." :
+              action === "api" ? "Describe the API requirements..." :
+              action === "readme" ? "Project name and description..." :
+              action === "summary" ? "Describe the project..." :
+              "Additional context..."
             }
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
@@ -134,12 +215,31 @@ export function AiCodeSidebar({
 
         <Button
           size="sm"
-          className="w-full"
+          className="w-full mt-1"
           onClick={handleAction}
           loading={loading}
           disabled={loading}
         >
-          {action === "explain" ? "Explain Code" : "Generate"}
+          {action === "explain" ? "Explain Code" :
+           action === "generate" ? "Generate" :
+           action === "fix" ? "Fix Bugs" :
+           action === "optimize" ? "Optimize" :
+           action === "refactor" ? "Refactor" :
+           action === "comments" ? "Add Comments" :
+           action === "uncomment" ? "Remove Comments" :
+           action === "convert" ? "Convert" :
+           action === "tests" ? "Generate Tests" :
+           action === "errors" ? "Explain Error" :
+           action === "security" ? "Check Security" :
+           action === "complexity" ? "Analyze" :
+           action === "performance" ? "Analyze" :
+           action === "sql" ? "Generate SQL" :
+           action === "regex" ? "Generate Regex" :
+           action === "docs" ? "Generate Docs" :
+           action === "api" ? "Design API" :
+           action === "readme" ? "Generate README" :
+           action === "summary" ? "Summarize" :
+           action === "commit" ? "Generate" : "Run"}
         </Button>
       </div>
 
@@ -161,7 +261,7 @@ export function AiCodeSidebar({
             <div className="prose prose-xs dark:prose-invert max-w-none text-xs text-surface-700 dark:text-surface-300">
               {response.split("```").map((part, i) =>
                 i % 2 === 0 ? (
-                  <p key={i} className="whitespace-pre-wrap">{part}</p>
+                  <p key={i} className="whitespace-pre-wrap text-xs">{part}</p>
                 ) : null
               )}
             </div>
@@ -208,7 +308,9 @@ export function AiCodeSidebar({
           <div className="text-center py-8">
             <Code className="h-8 w-8 mx-auto text-surface-300 dark:text-surface-600 mb-2" />
             <p className="text-xs text-surface-400">
-              Select code in the editor,<br />then choose an action.
+              {currentAction?.needsCode
+                ? "Select code in the editor, then choose an action."
+                : "Choose an action above to get started."}
             </p>
           </div>
         )}
