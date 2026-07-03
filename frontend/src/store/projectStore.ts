@@ -21,6 +21,9 @@ interface ProjectState {
   activeTabId: string | null;
   isLoading: boolean;
 
+  isSplit: boolean;
+  secondaryTabId: string | null;
+
   loadProjects: () => Promise<void>;
   createProject: (name: string, language?: string) => Promise<string | null>;
   openProject: (id: string) => Promise<void>;
@@ -39,6 +42,11 @@ interface ProjectState {
   createFolder: (filePath: string) => Promise<void>;
   deleteFileEntry: (filePath: string) => Promise<void>;
   renameFileEntry: (oldPath: string, newPath: string) => Promise<void>;
+
+  toggleSplit: () => void;
+  setSecondaryTab: (tabId: string) => void;
+  closeSecondaryTab: () => void;
+  openFileInSecondaryPane: (filePath: string, name: string) => Promise<void>;
 }
 
 const FILE_EXT_TO_LANG: Record<string, string> = {
@@ -63,6 +71,8 @@ export const useProjectStore = create<ProjectState>()(
     openTabs: [],
     activeTabId: null,
     isLoading: false,
+    isSplit: false,
+    secondaryTabId: null,
 
     loadProjects: async () => {
       try {
@@ -177,11 +187,15 @@ export const useProjectStore = create<ProjectState>()(
       set((state) => {
         const idx = state.openTabs.findIndex((t) => t.path === filePath);
         if (idx === -1) return;
+        const tabId = state.openTabs[idx].id;
         state.openTabs.splice(idx, 1);
-        if (state.activeTabId === state.openTabs[idx]?.id) {
+        if (state.activeTabId === tabId) {
           state.activeTabId = state.openTabs[Math.min(idx, state.openTabs.length - 1)]?.id || null;
         } else if (state.openTabs.length === 0) {
           state.activeTabId = null;
+        }
+        if (state.secondaryTabId === tabId) {
+          state.secondaryTabId = null;
         }
       });
     },
@@ -266,6 +280,53 @@ export const useProjectStore = create<ProjectState>()(
         );
       });
       await get().loadFileTree();
+    },
+
+    toggleSplit: () => {
+      set((state) => {
+        state.isSplit = !state.isSplit;
+        if (!state.isSplit) state.secondaryTabId = null;
+      });
+    },
+
+    setSecondaryTab: (tabId) => {
+      set((state) => { state.secondaryTabId = tabId; });
+    },
+
+    closeSecondaryTab: () => {
+      set((state) => { state.secondaryTabId = null; });
+    },
+
+    openFileInSecondaryPane: async (filePath, name) => {
+      const project = get().currentProject;
+      if (!project) return;
+
+      const existing = get().openTabs.find((t) => t.path === filePath);
+      if (existing) {
+        set((state) => { state.secondaryTabId = existing.id; });
+        return;
+      }
+
+      try {
+        const { data } = await api.get(`/projects/${project.id}/read`, {
+          params: { path: filePath },
+        });
+        const tab: EditorTab = {
+          id: crypto.randomUUID(),
+          path: filePath,
+          name,
+          language: data.data.language || extToLang(name),
+          content: data.data.content,
+          originalContent: data.data.content,
+          isDirty: false,
+        };
+        set((state) => {
+          state.openTabs.push(tab);
+          state.secondaryTabId = tab.id;
+        });
+      } catch {
+        // silently fail
+      }
     },
   }))
 );

@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
+  PanelRight,
 } from "lucide-react";
 import type { ProjectFile } from "@shared/types/project";
 import { useProjectStore } from "@/store/projectStore";
@@ -195,6 +196,8 @@ export function FileExplorer() {
   const deleteFileEntry = useProjectStore((s) => s.deleteFileEntry);
   const renameFileEntry = useProjectStore((s) => s.renameFileEntry);
   const loadFileTree = useProjectStore((s) => s.loadFileTree);
+  const isSplit = useProjectStore((s) => s.isSplit);
+  const openFileInSecondaryPane = useProjectStore((s) => s.openFileInSecondaryPane);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -352,6 +355,17 @@ export function FileExplorer() {
               </button>
               <div className="border-t border-surface-200 dark:border-surface-700 my-1" />
             </>
+          )}
+          {contextMenu.entry && !contextMenu.entry.isDirectory && isSplit && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300"
+              onClick={() => {
+                openFileInSecondaryPane(contextMenu.entry!.path, contextMenu.entry!.name);
+                closeContextMenu();
+              }}
+            >
+              <PanelRight className="h-3.5 w-3.5" /> Open to Side
+            </button>
           )}
           <button
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Editor, { OnMount } from "@monaco-editor/react";
+import { useAuthStore } from "@/store/authStore";
 import { useProjectStore } from "@/store/projectStore";
 import { FileExplorer } from "./FileExplorer";
 import { FileTabs } from "./FileTabs";
@@ -16,6 +17,8 @@ import {
   Sparkles,
   Folder,
   MessageSquare,
+  Columns2,
+  IndentIncrease,
 } from "lucide-react";
 
 const WELCOME_CODE = `// Welcome to ai for all — AI Coding Assistant
@@ -39,7 +42,12 @@ export function EditorPage() {
   const saveCurrentFile = useProjectStore((s) => s.saveCurrentFile);
   const closeFile = useProjectStore((s) => s.closeFile);
   const setActiveTab = useProjectStore((s) => s.setActiveTab);
+  const isSplit = useProjectStore((s) => s.isSplit);
+  const secondaryTabId = useProjectStore((s) => s.secondaryTabId);
+  const toggleSplit = useProjectStore((s) => s.toggleSplit);
+  const closeSecondaryTab = useProjectStore((s) => s.closeSecondaryTab);
 
+  const userSettings = useAuthStore((s) => s.user?.settings);
   const [showExplorer, setShowExplorer] = useState(true);
   const [showAiSidebar, setShowAiSidebar] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
@@ -82,6 +90,20 @@ export function EditorPage() {
   const activeTab = openTabs.find((t) => t.id === activeTabId);
   const code = activeTab?.content ?? WELCOME_CODE;
   const language = activeTab?.language ?? "typescript";
+  const editorOptions: Record<string, unknown> = {
+    fontSize: userSettings?.fontSize ?? 14,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    minimap: { enabled: userSettings?.minimap ?? true },
+    lineNumbers: userSettings?.lineNumbers === false ? "off" : "on",
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+    wordWrap: userSettings?.wordWrap === false ? "off" : "on",
+    tabSize: userSettings?.tabSize ?? 2,
+    smoothScrolling: true,
+    cursorBlinking: "smooth",
+    cursorSmoothCaretAnimation: "on",
+    padding: { top: 16 },
+  };
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
@@ -98,6 +120,10 @@ export function EditorPage() {
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       saveCurrentFile();
+    });
+
+    editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+      editor.getAction("editor.action.formatDocument")?.run();
     });
   };
 
@@ -170,6 +196,20 @@ export function EditorPage() {
               >
                 <Save className="h-4 w-4" />
               </button>
+              <button
+                onClick={() => editorRef.current?.getAction("editor.action.formatDocument")?.run()}
+                className="btn-ghost p-1.5"
+                title="Format Document (Shift+Alt+F)"
+              >
+                <IndentIncrease className="h-4 w-4" />
+              </button>
+              <button
+                onClick={toggleSplit}
+                className={cn("btn-ghost p-1.5", isSplit && "bg-primary-50 dark:bg-primary-950 text-primary-500")}
+                title={isSplit ? "Close Split" : "Split Editor"}
+              >
+                <Columns2 className="h-4 w-4" />
+              </button>
             </>
           )}
         </div>
@@ -225,37 +265,92 @@ export function EditorPage() {
 
         {/* Editor Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <FileTabs />
-          <div className="flex-1">
-            {isLoading ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="animate-spin h-6 w-6 border-2 border-primary-500 border-t-transparent rounded-full" />
+          {isSplit ? (
+            <div className="flex flex-1 overflow-hidden">
+              {/* Primary Editor */}
+              <div className="flex-1 flex flex-col overflow-hidden border-r border-surface-300 dark:border-surface-600">
+                <FileTabs />
+                <div className="flex-1">
+                  <Editor
+                    height="100%"
+                    language={language}
+                    value={code}
+                    onChange={handleEditorChange}
+                    theme="vs-dark"
+                    onMount={handleEditorMount}
+                    options={editorOptions}
+                  />
+                </div>
               </div>
-            ) : (
-              <Editor
-                height="100%"
-                language={language}
-                value={code}
-                onChange={handleEditorChange}
-                theme="vs-dark"
-                onMount={handleEditorMount}
-                options={{
-                  fontSize: 14,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                  minimap: { enabled: true },
-                  lineNumbers: "on",
-                  automaticLayout: true,
-                  scrollBeyondLastLine: false,
-                  wordWrap: "on",
-                  tabSize: 2,
-                  smoothScrolling: true,
-                  cursorBlinking: "smooth",
-                  cursorSmoothCaretAnimation: "on",
-                  padding: { top: 16 },
-                }}
-              />
-            )}
-          </div>
+              {/* Secondary Editor */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center h-9 bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 overflow-x-auto">
+                  {secondaryTabId ? (
+                    <div className="flex items-center h-full">
+                      <button
+                        className="flex items-center gap-1 px-3 h-full text-xs font-medium border-r border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-200"
+                      >
+                        {openTabs.find((t) => t.id === secondaryTabId)?.name}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-3 text-xs text-surface-400">
+                      Select a file to open in secondary pane
+                    </div>
+                  )}
+                  {secondaryTabId && (
+                    <button
+                      onClick={closeSecondaryTab}
+                      className="ml-auto btn-ghost p-1 mr-1"
+                      title="Close Secondary"
+                    >
+                      <span className="text-xs">&times;</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1">
+                  {secondaryTabId ? (
+                    <Editor
+                      height="100%"
+                      language={openTabs.find((t) => t.id === secondaryTabId)?.language ?? "plaintext"}
+                      value={openTabs.find((t) => t.id === secondaryTabId)?.content ?? ""}
+                      onChange={(value) => {
+                        const tab = openTabs.find((t) => t.id === secondaryTabId);
+                        if (tab && value !== undefined) updateFileContent(tab.path, value);
+                      }}
+                      theme="vs-dark"
+                      options={editorOptions}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-surface-400">
+                      Right-click a file → "Open to Side"
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <FileTabs />
+              <div className="flex-1">
+                {isLoading ? (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary-500 border-t-transparent rounded-full" />
+                  </div>
+                ) : (
+                  <Editor
+                    height="100%"
+                    language={language}
+                    value={code}
+                    onChange={handleEditorChange}
+                    theme="vs-dark"
+                    onMount={handleEditorMount}
+                    options={editorOptions}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
