@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS projects (
   framework TEXT,
   files INTEGER DEFAULT 0,
   folders INTEGER DEFAULT 0,
+  file_index TEXT,
+  file_count INTEGER DEFAULT 0,
+  line_count INTEGER DEFAULT 0,
+  indexed_at TEXT,
   last_opened TEXT DEFAULT NOW(),
   created_at TEXT DEFAULT NOW()
 );

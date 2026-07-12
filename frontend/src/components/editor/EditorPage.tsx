@@ -7,6 +7,7 @@ import { FileExplorer } from "./FileExplorer";
 import { FileTabs } from "./FileTabs";
 import { StatusBar } from "./StatusBar";
 import { AiCodeSidebar } from "./AiCodeSidebar";
+import { ProjectIntelligence } from "./ProjectIntelligence";
 import { Button } from "@/components/common";
 import { cn } from "@/utils/cn";
 import {
@@ -19,6 +20,7 @@ import {
   MessageSquare,
   Columns2,
   IndentIncrease,
+  Brain,
 } from "lucide-react";
 
 const WELCOME_CODE = `// Welcome to ai for all — AI Coding Assistant
@@ -51,6 +53,7 @@ export function EditorPage() {
   const saveFile = useProjectStore((s) => s.saveFile);
   const [showExplorer, setShowExplorer] = useState(true);
   const [showAiSidebar, setShowAiSidebar] = useState(false);
+  const [showIntelligence, setShowIntelligence] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectLang, setNewProjectLang] = useState("typescript");
@@ -229,6 +232,13 @@ export function EditorPage() {
 
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setShowIntelligence(!showIntelligence)}
+            className={cn("btn-ghost p-1.5", showIntelligence && "bg-primary-50 dark:bg-primary-950 text-primary-500")}
+            title={showIntelligence ? "Close Intelligence" : "Project Intelligence"}
+          >
+            <Brain className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => setShowAiSidebar(!showAiSidebar)}
             className={cn("btn-ghost p-1.5", showAiSidebar && "bg-primary-50 dark:bg-primary-950 text-primary-500")}
             title={showAiSidebar ? "Close AI Assistant" : "AI Assistant"}
@@ -263,6 +273,13 @@ export function EditorPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Intelligence Sidebar */}
+        {showIntelligence && (
+          <div className="w-72 border-l border-surface-200 dark:border-surface-700 overflow-hidden flex-shrink-0">
+            <ProjectIntelligence />
           </div>
         )}
 
