@@ -21,9 +21,10 @@ function generateResetToken(): string {
 
 export async function signup(req: AuthRequest, res: Response) {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, name } = req.body;
 
-    const existing = await query("SELECT id FROM users WHERE email = $1 OR username = $2", [email, username]);
+    const finalUsername = username || name || email.split("@")[0];
+    const existing = await query("SELECT id FROM users WHERE email = $1 OR username = $2", [email, finalUsername]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, error: "User already exists" });
     }
@@ -35,32 +36,32 @@ export async function signup(req: AuthRequest, res: Response) {
     const result = await query(
       `INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)
        RETURNING id, username, email, role, settings, created_at`,
-      [username, email, passwordHash, role]
+      [finalUsername, email, passwordHash, role]
     );
 
     const user = result.rows[0];
-    const token = generateToken(user.id);
+    const token = generateToken(user.id as string);
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const device = ((req.headers["user-agent"] as string) || "Unknown").slice(0, 255);
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || (req.ip as string) || "0.0.0.0";
 
     await query(
       "INSERT INTO sessions (user_id, token, device, ip) VALUES ($1, $2, $3, $4)",
-      [user.id, tokenHash, device, ip]
+      [user.id as string, tokenHash, device, ip]
     );
 
-    logger.info("User signed up", { userId: user.id, email });
+    logger.info("User signed up", { userId: user.id as string, email });
 
     // Send verification email automatically (fire-and-forget)
     const vToken = generateResetToken();
     const vExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     query(
       "INSERT INTO verification_tokens (user_id, token, type, expires_at) VALUES ($1, $2, 'email_verification', $3)",
-      [user.id, vToken, vExpires]
+      [user.id as string, vToken, vExpires]
     ).then(() => {
       const verifyUrl = `${config.appUrl}/verify-email?token=${vToken}`;
       sendEmail(
-        user.email,
+        user.email as string,
         "Verify your email address",
         buildEmailHtml(
           "Welcome to ai for all!",
@@ -74,12 +75,12 @@ export async function signup(req: AuthRequest, res: Response) {
       success: true,
       data: {
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          settings: parseJsonField(user.settings),
-          createdAt: user.created_at,
+          id: user.id as string,
+          username: user.username as string,
+          email: user.email as string,
+          role: user.role as string,
+          settings: parseJsonField(user.settings as string),
+          createdAt: user.created_at as string,
         },
         token,
       },
@@ -105,33 +106,33 @@ export async function login(req: AuthRequest, res: Response) {
     }
 
     const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password_hash);
+    const validPassword = await bcrypt.compare(password, user.password_hash as string);
 
     if (!validPassword) {
       return res.status(401).json({ success: false, error: "Invalid credentials" });
     }
 
-    const token = generateToken(user.id);
+    const token = generateToken(user.id as string);
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const device = ((req.headers["user-agent"] as string) || "Unknown").slice(0, 255);
     const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || (req.ip as string) || "0.0.0.0";
 
     await query(
       "INSERT INTO sessions (user_id, token, device, ip) VALUES ($1, $2, $3, $4)",
-      [user.id, tokenHash, device, ip]
+      [user.id as string, tokenHash, device, ip]
     );
 
-    logger.info("User logged in", { userId: user.id });
+    logger.info("User logged in", { userId: user.id as string });
 
     res.json({
       success: true,
       data: {
         user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          settings: parseJsonField(user.settings),
+          id: user.id as string,
+          username: user.username as string,
+          email: user.email as string,
+          role: user.role as string,
+          settings: parseJsonField(user.settings as string),
         },
         token,
       },
@@ -178,14 +179,14 @@ export async function getMe(req: AuthRequest, res: Response) {
     res.json({
       success: true,
       data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        role: user.role,
-        emailVerified: !!(user.email_verified),
-        settings: parseJsonField(user.settings),
-        createdAt: user.created_at,
+        id: user.id as string,
+        username: user.username as string,
+        email: user.email as string,
+        avatar: user.avatar as string,
+        role: user.role as string,
+        emailVerified: !!(user.email_verified as number),
+        settings: parseJsonField(user.settings as string),
+        createdAt: user.created_at as string,
       },
     });
   } catch (error) {
@@ -284,7 +285,7 @@ export async function sendVerificationEmail(req: AuthRequest, res: Response) {
 
     const verifyUrl = `${config.appUrl}/verify-email?token=${token}`;
     await sendEmail(
-      user.rows[0].email,
+      user.rows[0].email as string,
       "Verify your email address",
       buildEmailHtml(
         "Verify your email",

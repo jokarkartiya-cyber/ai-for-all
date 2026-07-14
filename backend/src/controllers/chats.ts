@@ -38,7 +38,7 @@ async function callAiService(
     if (!response.ok) {
       throw new Error(`AI service error: ${response.statusText}`);
     }
-    return await response.json();
+    return await response.json() as { content: string; model: string };
   } catch (error) {
     logger.info("AI service not available, using mock response");
     return {

@@ -52,7 +52,7 @@ function createSqliteDriver(): DatabaseDriver {
   logger.info(`SQLite database opened at ${dbPath}`);
 
   return {
-    query(text: string, params?: unknown[]) {
+    async query(text: string, params?: unknown[]) {
       const upper = text.trim().toUpperCase();
       const hasReturning = upper.includes("RETURNING");
       const isSelect = upper.startsWith("SELECT") || upper.startsWith("WITH") || upper.startsWith("RETURNING");
