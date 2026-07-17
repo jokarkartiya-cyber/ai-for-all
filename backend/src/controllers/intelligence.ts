@@ -139,8 +139,9 @@ export async function indexProject(req: AuthRequest, res: Response) {
     }
 
     await query(
-      "UPDATE projects SET file_index = $1, file_count = $2, line_count = $3, indexed_at = NOW() WHERE id = $4",
-      [JSON.stringify(index.map((f) => ({ file_path: f.file_path, language: f.language, imports: f.imports, exports: f.exports, size: f.size }))),
+      "UPDATE projects SET path = $1, file_index = $2, file_count = $3, line_count = $4, indexed_at = NOW() WHERE id = $5",
+      [fullPath,
+       JSON.stringify(index.map((f) => ({ file_path: f.file_path, language: f.language, imports: f.imports, exports: f.exports, size: f.size }))),
        index.length, totalLines, req.params.id]
     );
 
@@ -209,7 +210,7 @@ export async function searchProject(req: AuthRequest, res: Response) {
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: "Project not found" });
 
     const projectPath = result.rows[0].path as string;
-    const fullPath = path.join(WORKSPACE_DIR, projectPath);
+    const fullPath = path.isAbsolute(projectPath) ? projectPath : path.join(WORKSPACE_DIR, projectPath);
     if (!existsSync(fullPath)) return res.status(404).json({ success: false, error: "Project directory not found" });
 
     const files = await walkDir(fullPath, "");
@@ -250,7 +251,7 @@ export async function detectDuplicates(req: AuthRequest, res: Response) {
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: "Project not found" });
 
     const projectPath = result.rows[0].path as string;
-    const fullPath = path.join(WORKSPACE_DIR, projectPath);
+    const fullPath = path.isAbsolute(projectPath) ? projectPath : path.join(WORKSPACE_DIR, projectPath);
     if (!existsSync(fullPath)) return res.status(404).json({ success: false, error: "Project directory not found" });
 
     const files = await walkDir(fullPath, "");
