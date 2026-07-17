@@ -12,6 +12,7 @@ import {
   FolderTree,
   BookOpen,
   RefreshCw,
+  Skull,
 } from "lucide-react";
 
 interface SearchResult {
@@ -41,7 +42,15 @@ interface Dependency {
   language: string;
 }
 
-type Tab = "summary" | "deps" | "search" | "duplicates" | "relationships";
+interface DeadItem {
+  file: string;
+  type: string;
+  name: string;
+  line: number;
+  reason: string;
+}
+
+type Tab = "summary" | "deps" | "search" | "duplicates" | "relationships" | "deadcode";
 
 export function ProjectIntelligence() {
   const currentProject = useProjectStore((s) => s.currentProject);
@@ -56,6 +65,7 @@ export function ProjectIntelligence() {
   const [searchType, setSearchType] = useState<string>("");
   const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [deadCode, setDeadCode] = useState<DeadItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [indexed, setIndexed] = useState(false);
 
@@ -127,12 +137,23 @@ export function ProjectIntelligence() {
     setLoading(false);
   }, [projectId]);
 
+  const handleLoadDeadCode = useCallback(async () => {
+    if (!projectId) return;
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/intelligence/${projectId}/dead-code`);
+      setDeadCode(data.data.deadItems || []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [projectId]);
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "summary", label: "Summary", icon: <BookOpen className="h-3.5 w-3.5" /> },
     { key: "deps", label: "Deps", icon: <GitBranch className="h-3.5 w-3.5" /> },
     { key: "search", label: "Search", icon: <Search className="h-3.5 w-3.5" /> },
     { key: "duplicates", label: "Duplicates", icon: <CopyCheck className="h-3.5 w-3.5" /> },
     { key: "relationships", label: "Relations", icon: <FolderTree className="h-3.5 w-3.5" /> },
+    { key: "deadcode", label: "Dead Code", icon: <Skull className="h-3.5 w-3.5" /> },
   ];
 
   if (!currentProject) {
@@ -312,6 +333,38 @@ export function ProjectIntelligence() {
               </div>
             ))}
             {relationships.length === 0 && !loading && <p className="text-xs text-surface-400 text-center py-4">No relationships found. Index first.</p>}
+          </div>
+        )}
+
+        {activeTab === "deadcode" && (
+          <div className="space-y-2">
+            <Button size="sm" className="w-full" onClick={handleLoadDeadCode} loading={loading}>
+              <Skull className="h-3 w-3 mr-1" /> Detect Dead Code
+            </Button>
+            {deadCode.length > 0 && (
+              <p className="text-[10px] text-surface-400">{deadCode.length} issues found</p>
+            )}
+            {deadCode.map((item, i) => (
+              <div key={i} className="p-2 rounded bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-medium",
+                    item.type === "unused-import" && "bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400",
+                    item.type === "unused-variable" && "bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400",
+                    item.type === "unreachable-code" && "bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400",
+                    item.type === "empty-function" && "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400",
+                    item.type === "empty-block" && "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
+                  )}>
+                    {item.type}
+                  </span>
+                </div>
+                <div className="text-[10px] text-surface-700 dark:text-surface-300">
+                  {item.file}:{item.line}
+                </div>
+                {item.name && <div className="text-[10px] font-mono text-amber-600 dark:text-amber-400 mt-0.5">{item.name}</div>}
+                <div className="text-[9px] text-surface-400 mt-0.5">{item.reason}</div>
+              </div>
+            ))}
+            {deadCode.length === 0 && !loading && <p className="text-xs text-surface-400 text-center py-4">No dead code detected</p>}
           </div>
         )}
       </div>

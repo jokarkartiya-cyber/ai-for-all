@@ -7,6 +7,7 @@ import {
   searchProject,
   detectDuplicates,
   getFileRelationships,
+  detectDeadCode,
 } from "../controllers/intelligence";
 
 const router = Router();
@@ -18,5 +19,6 @@ router.get("/:id/dependencies", getDependencies);
 router.post("/:id/search", searchProject);
 router.get("/:id/duplicates", detectDuplicates);
 router.get("/:id/relationships", getFileRelationships);
+router.get("/:id/dead-code", detectDeadCode);
 
 export default router;

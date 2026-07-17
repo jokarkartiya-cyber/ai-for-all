@@ -326,3 +326,88 @@ export async function getFileRelationships(req: AuthRequest, res: Response) {
     res.status(500).json({ success: false, error: "Failed to get relationships" });
   }
 }
+
+export async function detectDeadCode(req: AuthRequest, res: Response) {
+  try {
+    const result = await query("SELECT path, file_index FROM projects WHERE id = $1 AND user_id = $2", [req.params.id, req.userId]);
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: "Project not found" });
+
+    const projectPath = result.rows[0].path as string;
+    const fullPath = path.isAbsolute(projectPath) ? projectPath : path.join(WORKSPACE_DIR, projectPath);
+    const fileIndex: { file_path: string; imports: string[]; exports: string[]; language: string; size: number }[] = result.rows[0].file_index ? JSON.parse(result.rows[0].file_index as string) : [];
+
+    const deadItems: { file: string; type: string; name: string; line: number; reason: string }[] = [];
+
+    for (const fi of fileIndex) {
+      const ext = path.extname(fi.file_path);
+      if (fi.language === "plaintext" || ext === ".json" || ext === ".md") continue;
+
+      try {
+        const fileContent = await fs.readFile(path.join(fullPath, fi.file_path), "utf-8");
+        const lines = fileContent.split("\n");
+
+        // Unused imports
+        for (const imp of fi.imports) {
+          const localName = imp.split("/").pop()?.replace(/['";]/g, "").replace(/\.\w+$/, "") || "";
+          if (!localName || imp.startsWith(".")) continue;
+          const usedInFile = lines.some((l, idx) => {
+            if (l.includes(imp)) return false;
+            return new RegExp(`\\b${escapeRegex(localName)}\\b`).test(l);
+          });
+          if (!usedInFile) {
+            const lineNum = lines.findIndex((l) => l.includes(imp)) + 1;
+            deadItems.push({ file: fi.file_path, type: "unused-import", name: localName, line: lineNum, reason: `Imported but never used` });
+          }
+        }
+
+        // Check each line for dead patterns
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+
+          // Skip empty lines and comments
+          if (!line || line.startsWith("//") || line.startsWith("#") || line.startsWith("/*") || line.startsWith("*")) continue;
+
+          // Unused variables (let/const/var assignment not referenced below)
+          const varMatch = line.match(/^(?:let|const|var)\s+(\w+)\s*=/);
+          if (varMatch) {
+            const varName = varMatch[1];
+            const rest = lines.slice(i + 1).join("\n");
+            if (!new RegExp(`\\b${escapeRegex(varName)}\\b`).test(rest) && !fi.exports.includes(varName)) {
+              deadItems.push({ file: fi.file_path, type: "unused-variable", name: varName, line: i + 1, reason: "Variable declared but never used" });
+            }
+          }
+
+          // Unreachable code after return/throw
+          if ((line.startsWith("return") || line.startsWith("throw")) && i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            if (nextLine && !nextLine.startsWith("}") && !nextLine.startsWith(")") && !nextLine.startsWith("//") && !nextLine.startsWith("#")) {
+              deadItems.push({ file: fi.file_path, type: "unreachable-code", name: "", line: i + 2, reason: "Code after return/throw is unreachable" });
+            }
+          }
+
+          // Empty function body
+          if (line.includes("function") && line.endsWith("{}")) {
+            const match = line.match(/function\s+(\w+)/);
+            if (match) {
+              deadItems.push({ file: fi.file_path, type: "empty-function", name: match[1], line: i + 1, reason: "Function has empty body" });
+            }
+          }
+
+          // Empty catch/if block
+          if ((line.includes("catch") || line.includes("else")) && line.endsWith("{}")) {
+            deadItems.push({ file: fi.file_path, type: "empty-block", name: "", line: i + 1, reason: `Empty ${line.includes("catch") ? "catch" : "else"} block` });
+          }
+        }
+      } catch { /* skip unreadable */ }
+    }
+
+    res.json({ success: true, data: { deadItems, total: deadItems.length } });
+  } catch (error) {
+    logger.error("Dead code detection failed", { error });
+    res.status(500).json({ success: false, error: "Failed to detect dead code" });
+  }
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
